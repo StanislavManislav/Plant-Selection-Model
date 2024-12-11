@@ -1,0 +1,702 @@
+---
+title: "Climate Resilient Plants"
+author: "Stanislav Bagh"
+date: "2024-11-23"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r Loading packages and data}
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(tidyr)
+```
+
+
+
+```{r precipiation distribution}
+# Data from Table 3 on page 12 for seasonal projections of precipitation
+# Average precipitation (mm) for Past, 2050s, and 2080s for each season
+precipitation_data <- data.frame(
+  Season = c("Fall", "Winter", "Spring", "Summer"),
+  Past = c(580, 683, 400, 206),
+  `2050s` = c(642, 714, 430, 168),
+  `2080s` = c(693, 780, 447, 147),
+  Past_sd = c(25, 30, 20, 12),
+  `2050s_sd` = c(27.5, 32.5, 21.25, 13.75),
+  `2080s_sd` = c(30, 35, 22.5, 15)  # Adding standard deviation for uncertainty
+)
+
+# Function to create KDE data with uncertainty bands for each season
+create_kde_data_with_uncertainty <- function(season_name, past_value, future_2050s_value, future_2080s_value, past_sd, future_2050s_sd, future_2080s_sd) {
+  # Generate synthetic monthly data based on seasonal value (assuming equal distribution within the season)
+  monthly_past <- rnorm(1000, mean = past_value / 3, sd = past_sd / 3)
+  monthly_2050s <- rnorm(1000, mean = future_2050s_value / 3, sd = future_2050s_sd / 3)
+  monthly_2080s <- rnorm(1000, mean = future_2080s_value / 3, sd = future_2080s_sd / 3)
+
+  # Kernel density estimates
+  past_density <- density(monthly_past, from = 0)
+  future_2050s_density <- density(monthly_2050s, from = 0)
+  future_2080s_density <- density(monthly_2080s, from = 0)
+
+  # Create dataframe for plotting
+  kde_data <- data.frame(
+    Precipitation = c(past_density$x, future_2050s_density$x, future_2080s_density$x),
+    Density = c(past_density$y, future_2050s_density$y, future_2080s_density$y),
+    Year = rep(c("Past", "2050s", "2080s"), each = length(past_density$x)),
+    Season = season_name
+  )
+  return(kde_data)
+}
+
+# Generate KDE data with uncertainty for each season
+fall_data <- create_kde_data_with_uncertainty("Fall", 580, 642, 693, 50, 55, 60)
+winter_data <- create_kde_data_with_uncertainty("Winter", 683, 714, 780, 60, 65, 70)
+spring_data <- create_kde_data_with_uncertainty("Spring", 400, 430, 447, 40, 45, 50)
+summer_data <- create_kde_data_with_uncertainty("Summer", 206, 168, 147, 20, 25, 30)
+
+# Combine all seasonal data into one dataframe
+all_seasons_data <- rbind(fall_data, winter_data, spring_data, summer_data)
+
+# Plot the kernel density estimates for each season with uncertainty using ggplot2
+season_list <- unique(all_seasons_data$Season)
+for (season in season_list) {
+  season_data <- subset(all_seasons_data, Season == season)
+  p <- ggplot(season_data, aes(x = Precipitation, y = Density, color = Year, fill = Year)) +
+    geom_line(size = 1) +
+    geom_ribbon(aes(ymin = Density - 0.1 * Density, ymax = Density + 0.1 * Density), alpha = 0.2) +  # Adding uncertainty band
+    labs(title = paste("KDE of Projected Monthly Precipitation in", season, "(mm)"),
+         x = "Precipitation (mm)",
+         y = "Probability Density",
+         color = "Year",
+         fill = "Year") +
+    theme_minimal() +
+    scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+    scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red"))
+  print(p)
+}
+
+
+```
+
+```{r more precipiation graphs}
+# Data from Table 3 on page 12 for total annual projections of precipitation
+# Average total annual precipitation (mm) for Past, 2050s, and 2080s
+precipitation_data <- data.frame(
+  Year = c("Past", "2050s", "2080s"),
+  Total_Precipitation = c(1869, 1953, 2068),
+  SD = c(62.5, 67.5, 75)  # Estimated standard deviations for each year
+)
+
+# Generate synthetic data for KDE of total annual precipitation
+set.seed(123)
+total_kde_data <- data.frame(
+  Year = rep(precipitation_data$Year, each = 1000),
+  Total_Precipitation = c(
+    rnorm(1000, mean = precipitation_data$Total_Precipitation[1], sd = precipitation_data$SD[1]),
+    rnorm(1000, mean = precipitation_data$Total_Precipitation[2], sd = precipitation_data$SD[2]),
+    rnorm(1000, mean = precipitation_data$Total_Precipitation[3], sd = precipitation_data$SD[3])
+  )
+)
+
+# Plot KDE for total annual precipitation for Past, 2050s, and 2080s
+p <- ggplot(total_kde_data, aes(x = Total_Precipitation, color = Year, fill = Year)) +
+  geom_density(alpha = 0.4, size = 1) +
+  geom_ribbon(stat = "density", aes(ymin = ..density.. - 0.1 * ..density.., ymax = ..density.. + 0.1 * ..density..), alpha = 0.2) +  # Adding uncertainty band
+  labs(title = "KDE of Total Annual Precipitation (mm)",
+       x = "Total Precipitation (mm)",
+       y = "Density",
+       fill = "Year",
+       color = "Year") +
+  theme_minimal() +
+  scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+  scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red"))
+print(p)
+```
+
+```{r one last precipiation plot}
+# Data from Table 3 for seasonal projections of precipitation
+precipitation_data <- data.frame(
+  Season = c("Fall", "Winter", "Spring", "Summer"),
+  Past = c(580, 683, 400, 206),
+  `2050s` = c(642, 714, 430, 168),
+  `2080s` = c(693, 780, 447, 147),
+  Past_sd = c(25, 30, 20, 12.5),
+  `2050s_sd` = c(27.5, 32.5, 21.25, 13.75),
+  `2080s_sd` = c(30, 35, 22.5, 15)
+)
+
+# Function to create KDE data with uncertainty bands for each season
+create_kde_data_with_uncertainty <- function(season_name, past_value, future_2050s_value, future_2080s_value, past_sd, future_2050s_sd, future_2080s_sd) {
+  # Generate synthetic monthly data based on seasonal value (assuming equal distribution within the season)
+  monthly_past <- rnorm(1000, mean = past_value / 3, sd = past_sd / 3)
+  monthly_2050s <- rnorm(1000, mean = future_2050s_value / 3, sd = future_2050s_sd / 3)
+  monthly_2080s <- rnorm(1000, mean = future_2080s_value / 3, sd = future_2080s_sd / 3)
+
+  # Kernel density estimates
+  past_density <- density(monthly_past, from = 0)
+  future_2050s_density <- density(monthly_2050s, from = 0)
+  future_2080s_density <- density(monthly_2080s, from = 0)
+
+  # Create dataframe for plotting
+  kde_data <- data.frame(
+    Precipitation = c(past_density$x, future_2050s_density$x, future_2080s_density$x),
+    Density = c(past_density$y, future_2050s_density$y, future_2080s_density$y),
+    Year = rep(c("Past", "2050s", "2080s"), each = length(past_density$x)),
+    Season = season_name
+  )
+  return(kde_data)
+}
+
+# Generate KDE data with uncertainty for each season
+fall_data <- create_kde_data_with_uncertainty("Fall", 580, 642, 693, 25, 27.5, 30)
+winter_data <- create_kde_data_with_uncertainty("Winter", 683, 714, 780, 30, 32.5, 35)
+spring_data <- create_kde_data_with_uncertainty("Spring", 400, 430, 447, 20, 21.25, 22.5)
+summer_data <- create_kde_data_with_uncertainty("Summer", 206, 168, 147, 12.5, 13.75, 15)
+
+# Combine all seasonal data into one dataframe
+all_seasons_data <- rbind(fall_data, winter_data, spring_data, summer_data)
+
+# Create a combined KDE plot for all seasons using facet_wrap
+combined_plot <- ggplot(all_seasons_data, aes(x = Precipitation, y = Density, color = Year, fill = Year)) +
+  geom_line(size = 1) +
+  geom_ribbon(aes(ymin = Density - 0.1 * Density, ymax = Density + 0.1 * Density), alpha = 0.2) +  # Adding uncertainty band
+  facet_wrap(~ Season, ncol = 1, scales = "free_y") +  # Arrange the plots vertically and free y-axis scaling
+  labs(title = "KDE of Projected Monthly Precipitation by Season (mm)",
+       x = "Precipitation (mm)",
+       y = "Density",
+       color = "Year",
+       fill = "Year") +
+  theme_minimal() +
+  scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+  scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
+
+# Print the combined plot
+print(combined_plot)
+```
+```{r temperature}
+# Data from Table 1 and Table 2 on page 12 for seasonal projections of temperature
+# Average seasonal daytime high and nighttime low temperatures (°C) for Past, 2050s, and 2080s
+# Including estimated standard deviations for uncertainty representation
+
+daytime_high_data <- data.frame(
+  Season = c("Fall", "Winter", "Spring", "Summer"),
+  Past = c(13, 5, 12, 21),
+  `2050s` = c(15.8, 7.4, 14.9, 24.7),
+  `2080s` = c(17.5, 9.4, 16.7, 27),
+  Past_sd = c(1.5, 1.0, 1.2, 1.8),
+  `2050s_sd` = c(1.7, 1.2, 1.4, 2.0),
+  `2080s_sd` = c(2.0, 1.5, 1.6, 2.2)  # Adding estimated standard deviations
+)
+
+nighttime_low_data <- data.frame(
+  Season = c("Fall", "Winter", "Spring", "Summer"),
+  Past = c(5, -1, 3, 10),
+  `2050s` = c(7.8, 1.9, 5.9, 13.2),
+  `2080s` = c(9.5, 3.9, 7.6, 15.2),
+  Past_sd = c(1.2, 1.0, 1.0, 1.5),
+  `2050s_sd` = c(1.4, 1.2, 1.2, 1.7),
+  `2080s_sd` = c(1.6, 1.5, 1.4, 1.9)  # Adding estimated standard deviations
+)
+
+# Function to create KDE data with uncertainty bands for each season
+create_kde_temp_data <- function(season_name, past_value, future_2050s_value, future_2080s_value, past_sd, future_2050s_sd, future_2080s_sd) {
+  # Generate synthetic monthly data based on seasonal value
+  monthly_past <- rnorm(1000, mean = past_value, sd = past_sd)
+  monthly_2050s <- rnorm(1000, mean = future_2050s_value, sd = future_2050s_sd)
+  monthly_2080s <- rnorm(1000, mean = future_2080s_value, sd = future_2080s_sd)
+
+  # Kernel density estimates
+  past_density <- density(monthly_past, from = min(monthly_past))
+  future_2050s_density <- density(monthly_2050s, from = min(monthly_2050s))
+  future_2080s_density <- density(monthly_2080s, from = min(monthly_2080s))
+
+  # Create dataframe for plotting
+  kde_data <- data.frame(
+    Temperature = c(past_density$x, future_2050s_density$x, future_2080s_density$x),
+    Density = c(past_density$y, future_2050s_density$y, future_2080s_density$y),
+    Year = rep(c("Past", "2050s", "2080s"), each = length(past_density$x)),
+    Season = season_name
+  )
+  return(kde_data)
+}
+
+# Generate KDE data with uncertainty for each season for daytime highs
+fall_day_data <- create_kde_temp_data("Fall", 13, 15.8, 17.5, 1.5, 1.7, 2.0)
+winter_day_data <- create_kde_temp_data("Winter", 5, 7.4, 9.4, 1.0, 1.2, 1.5)
+spring_day_data <- create_kde_temp_data("Spring", 12, 14.9, 16.7, 1.2, 1.4, 1.6)
+summer_day_data <- create_kde_temp_data("Summer", 21, 24.7, 27, 1.8, 2.0, 2.2)
+
+# Combine all daytime high data into one dataframe
+daytime_high_kde_data <- rbind(fall_day_data, winter_day_data, spring_day_data, summer_day_data)
+
+# Generate KDE data with uncertainty for each season for nighttime lows
+fall_night_data <- create_kde_temp_data("Fall", 5, 7.8, 9.5, 1.2, 1.4, 1.6)
+winter_night_data <- create_kde_temp_data("Winter", -1, 1.9, 3.9, 1.0, 1.2, 1.5)
+spring_night_data <- create_kde_temp_data("Spring", 3, 5.9, 7.6, 1.0, 1.2, 1.4)
+summer_night_data <- create_kde_temp_data("Summer", 10, 13.2, 15.2, 1.5, 1.7, 1.9)
+
+# Combine all nighttime low data into one dataframe
+nighttime_low_kde_data <- rbind(fall_night_data, winter_night_data, spring_night_data, summer_night_data)
+
+# Plot the kernel density estimates for each season with uncertainty using ggplot2
+season_list <- unique(daytime_high_kde_data$Season)
+
+# Plot for Daytime Highs
+for (season in season_list) {
+  season_data <- subset(daytime_high_kde_data, Season == season)
+  p <- ggplot(season_data, aes(x = Temperature, y = Density, color = Year, fill = Year)) +
+    geom_line(size = 1) +
+    geom_ribbon(aes(ymin = Density - 0.1 * Density, ymax = Density + 0.1 * Density), alpha = 0.2) +  # Adding uncertainty band
+    labs(title = paste("KDE of Projected Daytime High Temperature in", season, "(°C)"),
+         x = "Temperature (°C)",
+         y = "Density",
+         color = "Year",
+         fill = "Year") +
+    theme_minimal() +
+    scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+    scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red"))
+  print(p)
+}
+
+# Plot for Nighttime Lows
+for (season in season_list) {
+  season_data <- subset(nighttime_low_kde_data, Season == season)
+  p <- ggplot(season_data, aes(x = Temperature, y = Density, color = Year, fill = Year)) +
+    geom_line(size = 1) +
+    geom_ribbon(aes(ymin = Density - 0.1 * Density, ymax = Density + 0.1 * Density), alpha = 0.2) +  # Adding uncertainty band
+    labs(title = paste("KDE of Projected Nighttime Low Temperature in", season, "(°C)"),
+         x = "Temperature (°C)",
+         y = "Density",
+         color = "Year",
+         fill = "Year") +
+    theme_minimal() +
+    scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+    scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red"))
+  print(p)
+}
+
+```
+
+```{r snowpack}
+# Data from Table 4 for seasonal projections of snowpack depth
+# Average seasonal snowpack depth (cm) for Past, 2050s, and 2080s
+# Including estimated standard deviations for uncertainty representation
+snowpack_data <- data.frame(
+  Season = c("Winter", "Spring", "Summer", "Fall"),
+  Past = c(208, 266, 73, 37),
+  `2050s` = c(93, 102, 11, 10),
+  `2080s` = c(49, 43, 3, 5),
+  Past_sd = c(20, 25, 10, 5),
+  `2050s_sd` = c(15, 20, 5, 4),
+  `2080s_sd` = c(10, 12, 3, 3)  # Adding estimated standard deviations
+)
+
+# Function to create KDE data with uncertainty bands for each season
+create_kde_snowpack_data <- function(season_name, past_value, future_2050s_value, future_2080s_value, past_sd, future_2050s_sd, future_2080s_sd) {
+  # Generate synthetic monthly data based on seasonal value
+  monthly_past <- rnorm(1000, mean = past_value, sd = past_sd)
+  monthly_2050s <- rnorm(1000, mean = future_2050s_value, sd = future_2050s_sd)
+  monthly_2080s <- rnorm(1000, mean = future_2080s_value, sd = future_2080s_sd)
+
+  # Kernel density estimates
+  past_density <- density(monthly_past, from = min(monthly_past))
+  future_2050s_density <- density(monthly_2050s, from = min(monthly_2050s))
+  future_2080s_density <- density(monthly_2080s, from = min(monthly_2080s))
+
+  # Create dataframe for plotting
+  kde_data <- data.frame(
+    Snowpack = c(past_density$x, future_2050s_density$x, future_2080s_density$x),
+    Density = c(past_density$y, future_2050s_density$y, future_2080s_density$y),
+    Year = rep(c("Past", "2050s", "2080s"), each = length(past_density$x)),
+    Season = season_name
+  )
+  return(kde_data)
+}
+
+# Generate KDE data with uncertainty for each season for snowpack depth
+winter_snowpack_data <- create_kde_snowpack_data("Winter", 208, 93, 49, 20, 15, 10)
+spring_snowpack_data <- create_kde_snowpack_data("Spring", 266, 102, 43, 25, 20, 12)
+summer_snowpack_data <- create_kde_snowpack_data("Summer", 73, 11, 3, 10, 5, 3)
+fall_snowpack_data <- create_kde_snowpack_data("Fall", 37, 10, 5, 5, 4, 3)
+
+# Combine all snowpack data into one dataframe
+snowpack_kde_data <- rbind(winter_snowpack_data, spring_snowpack_data, summer_snowpack_data, fall_snowpack_data)
+
+# Plot the kernel density estimates for each season with uncertainty using ggplot2
+season_list <- unique(snowpack_kde_data$Season)
+
+# Plot for Snowpack Depth
+for (season in season_list) {
+  season_data <- subset(snowpack_kde_data, Season == season)
+  p <- ggplot(season_data, aes(x = Snowpack, y = Density, color = Year, fill = Year)) +
+    geom_line(size = 1) +
+    geom_ribbon(aes(ymin = Density - 0.1 * Density, ymax = Density + 0.1 * Density), alpha = 0.2) +  # Adding uncertainty band
+    labs(title = paste("KDE of Projected Snowpack Depth in", season, "(cm)"),
+         x = "Snowpack Depth (cm)",
+         y = "Density",
+         color = "Year",
+         fill = "Year") +
+    theme_minimal() +
+    scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+    scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red"))
+  print(p)
+}
+```
+```{r dry spells}
+# Data from Table 6 for annual projections of dry spell duration
+# Average annual dry spell duration (days) for Past, 2050s, and 2080s
+# Including estimated standard deviations for uncertainty representation
+dry_spell_data <- data.frame(
+  Year = c("Past", "2050s", "2080s"),
+  Dry_Spell_Duration = c(21, 26, 29),
+  SD = c(3, 4, 5)  # Adding estimated standard deviations for uncertainty representation
+)
+
+# Generate synthetic data for KDE of dry spell duration
+set.seed(123)
+dry_spell_kde_data <- data.frame(
+  Year = rep(dry_spell_data$Year, each = 1000),
+  Dry_Spell_Duration = c(
+    rnorm(1000, mean = dry_spell_data$Dry_Spell_Duration[1], sd = dry_spell_data$SD[1]),
+    rnorm(1000, mean = dry_spell_data$Dry_Spell_Duration[2], sd = dry_spell_data$SD[2]),
+    rnorm(1000, mean = dry_spell_data$Dry_Spell_Duration[3], sd = dry_spell_data$SD[3])
+  )
+)
+
+# Plot KDE for dry spell duration for Past, 2050s, and 2080s
+p <- ggplot(dry_spell_kde_data, aes(x = Dry_Spell_Duration, color = Year, fill = Year)) +
+  geom_density(alpha = 0.4, size = 1) +
+  geom_ribbon(stat = "density", aes(ymin = ..density.. - 0.1 * ..density.., ymax = ..density.. + 0.1 * ..density..), alpha = 0.2) +  # Adding uncertainty band
+  labs(title = "KDE of Dry Spell Duration (days)",
+       x = "Dry Spell Duration (days)",
+       y = "Density",
+       fill = "Year",
+       color = "Year") +
+  theme_minimal() +
+  scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+  scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red"))
+print(p)
+
+# Load necessary libraries
+library(ggplot2)
+
+# Data from Table 6 for annual projections of dry spell duration
+# Average annual dry spell duration (days) for Past, 2050s, and 2080s
+# Including estimated standard deviations for uncertainty representation
+dry_spell_data <- data.frame(
+  Year = c("Past", "2050s", "2080s"),
+  Dry_Spell_Duration = c(21, 26, 29),
+  SD = c(3, 4, 5)  # Adding estimated standard deviations for uncertainty representation
+)
+
+# Generate synthetic data for dry spell duration
+set.seed(123)
+dry_spell_bar_data <- data.frame(
+  Year = rep(dry_spell_data$Year, each = 1000),
+  Dry_Spell_Duration = round(c(
+    rnorm(1000, mean = dry_spell_data$Dry_Spell_Duration[1], sd = dry_spell_data$SD[1]),
+    rnorm(1000, mean = dry_spell_data$Dry_Spell_Duration[2], sd = dry_spell_data$SD[2]),
+    rnorm(1000, mean = dry_spell_data$Dry_Spell_Duration[3], sd = dry_spell_data$SD[3])
+  ))
+)
+
+# Ensure all values are non-negative
+# Replace negative durations with zero (not physically meaningful)
+dry_spell_bar_data$Dry_Spell_Duration <- pmax(dry_spell_bar_data$Dry_Spell_Duration, 0)
+
+# Split the data by Year
+past_data <- subset(dry_spell_bar_data, Year == "Past")
+future_2050s_data <- subset(dry_spell_bar_data, Year == "2050s")
+future_2080s_data <- subset(dry_spell_bar_data, Year == "2080s")
+
+# Function to create bar plot for each year with consistent color coding
+create_bar_plot <- function(data, year_label, fill_color) {
+  ggplot(data, aes(x = as.factor(Dry_Spell_Duration))) +
+    geom_bar(fill = fill_color, color = "black") +
+    labs(title = paste("Dry Spell Duration for", year_label, "(days)"),
+         x = "Dry Spell Duration (days)",
+         y = "Frequency") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Create bar plots for Past, 2050s, and 2080s with consistent color coding
+graph_past <- create_bar_plot(past_data, "Past", "skyblue")
+graph_2050s <- create_bar_plot(future_2050s_data, "2050s", "orange")
+graph_2080s <- create_bar_plot(future_2080s_data, "2080s", "red")
+
+# Print the bar plots
+print(graph_past)
+print(graph_2050s)
+print(graph_2080s)
+
+```
+# frequency indicates how many times a dry spell occurs within a 1000 data points
+
+
+```{r Risk Assessment}
+# Load plant data from CSV file
+# Make sure to adjust the file path correctly to where your CSV file is located
+plant_data <- read.csv('C:/Users/Slava/Documents/EVSC 400/PlantData.csv')
+
+# Data for summer daytime high temperature projections (°C)
+daytime_high_data <- data.frame(
+  Season = "Summer",
+  Past = 21,
+  `2050s` = 24.7,
+  `2080s` = 27,
+ Past_sd = 1.8,
+  `2050s_sd` = 2.0,
+  `2080s_sd` = 2.2
+)
+
+# Function to create KDE data with uncertainty bands for summer season
+create_kde_temp_data <- function(past_value, future_2050s_value, future_2080s_value, past_sd, future_2050s_sd, future_2080s_sd) {
+  # Generate synthetic monthly data based on seasonal value
+  monthly_past <- rnorm(1000, mean = past_value, sd = past_sd)
+  monthly_2050s <- rnorm(1000, mean = future_2050s_value, sd = future_2050s_sd)
+  monthly_2080s <- rnorm(1000, mean = future_2080s_value, sd = future_2080s_sd)
+
+  # Kernel density estimates
+  past_density <- density(monthly_past, from = min(monthly_past))
+  future_2050s_density <- density(monthly_2050s, from = min(monthly_2050s))
+  future_2080s_density <- density(monthly_2080s, from = min(monthly_2080s))
+
+  # Create dataframe for plotting
+  kde_data <- data.frame(
+    Temperature = c(past_density$x, future_2050s_density$x, future_2080s_density$x),
+    Density = c(past_density$y, future_2050s_density$y, future_2080s_density$y),
+    Year = rep(c("Past", "2050s", "2080s"), each = length(past_density$x)),
+    Season = "Summer"
+  )
+  return(kde_data)
+}
+
+# Generate KDE data for summer daytime highs
+summer_day_data <- create_kde_temp_data(21, 24.7, 27, 1.8, 2.0, 2.2)
+
+# Initialize an empty dataframe to store results
+results <- data.frame(Species = character(), Year = character(), Preferred_Max_Temp = numeric(), Area_Right_Percentage = numeric(), stringsAsFactors = FALSE)
+
+# Loop over each plant to calculate area to the right of Preferred Max Temp
+for (i in 1:nrow(plant_data)) {
+  plant <- plant_data[i, ]
+  plant_name <- plant$Species
+  preferred_max_temp <- as.numeric(plant$Preferred.Max.Temp..C.)
+
+  # Loop through each time period: Past, 2050s, 2080s
+  for (year in unique(summer_day_data$Year)) {
+    # Subset data for each year
+    year_data <- subset(summer_day_data, Year == year)
+    
+    # Generate KDE for this subset
+    kde <- density(year_data$Temperature, from = min(year_data$Temperature))
+
+    # Calculate the area to the right of the Preferred Max Temperature
+    idx <- which(kde$x >= preferred_max_temp)
+    area_right <- sum(kde$y[idx]) * diff(kde$x[1:2])  # Multiplying by the bin width (assuming equal spacing)
+    area_right_percentage <- area_right * 100  # Convert to percentage
+    
+    # Store the result in the results dataframe
+    results <- rbind(results, data.frame(Species = plant_name, Year = year, Preferred_Max_Temp = preferred_max_temp, Area_Right_Percentage = round(area_right_percentage, 2)))
+  }
+}
+
+# Print the results as a table
+print(results)
+```
+
+```{r temp plot}
+# Load plant data from CSV file
+# Make sure to adjust the file path correctly to where your CSV file is located
+plant_data <- read.csv('C:/Users/Slava/Documents/EVSC 400/PlantData.csv')
+
+# Data from Table 1 and Table 2 for seasonal projections of temperature
+# Average seasonal daytime high and nighttime low temperatures (°C) for Past, 2050s, and 2080s
+# Including estimated standard deviations for uncertainty representation
+daytime_high_data <- data.frame(
+  Season = c("Fall", "Winter", "Spring", "Summer"),
+  Past = c(13, 5, 12, 21),
+  `2050s` = c(15.8, 7.4, 14.9, 24.7),
+  `2080s` = c(17.5, 9.4, 16.7, 27),
+  Past_sd = c(1.5, 1.0, 1.2, 1.8),
+  `2050s_sd` = c(1.7, 1.2, 1.4, 2.0),
+  `2080s_sd` = c(2.0, 1.5, 1.6, 2.2)  # Adding estimated standard deviations
+)
+
+
+# Function to create KDE data with uncertainty bands for each season
+create_kde_temp_data <- function(season_name, past_value, future_2050s_value, future_2080s_value, past_sd, future_2050s_sd, future_2080s_sd) {
+  # Generate synthetic monthly data based on seasonal value
+  monthly_past <- rnorm(1000, mean = past_value, sd = past_sd)
+  monthly_2050s <- rnorm(1000, mean = future_2050s_value, sd = future_2050s_sd)
+  monthly_2080s <- rnorm(1000, mean = future_2080s_value, sd = future_2080s_sd)
+
+  # Kernel density estimates
+  past_density <- density(monthly_past, from = min(monthly_past))
+  future_2050s_density <- density(monthly_2050s, from = min(monthly_2050s))
+  future_2080s_density <- density(monthly_2080s, from = min(monthly_2080s))
+
+  # Create dataframe for plotting
+  kde_data <- data.frame(
+    Temperature = c(past_density$x, future_2050s_density$x, future_2080s_density$x),
+    Density = c(past_density$y, future_2050s_density$y, future_2080s_density$y),
+    Year = rep(c("Past", "2050s", "2080s"), each = length(past_density$x)),
+    Season = season_name
+  )
+  return(kde_data)
+}
+
+# Generate KDE data with uncertainty for each season for daytime highs
+fall_day_data <- create_kde_temp_data("Fall", 13, 15.8, 17.5, 1.5, 1.7, 2.0)
+winter_day_data <- create_kde_temp_data("Winter", 5, 7.4, 9.4, 1.0, 1.2, 1.5)
+spring_day_data <- create_kde_temp_data("Spring", 12, 14.9, 16.7, 1.2, 1.4, 1.6)
+summer_day_data <- create_kde_temp_data("Summer", 21, 24.7, 27, 1.8, 2.0, 2.2)
+
+# Combine all daytime high data into one dataframe
+daytime_high_kde_data <- rbind(fall_day_data, winter_day_data, spring_day_data, summer_day_data)
+
+# Filter results for Deer Fern and Western Red Cedar
+filtered_results <- subset(results, Species %in% c("Deer Fern", "Western Red Cedar"))
+
+# Plotting KDE for Summer High Temperatures with Preferred Max Temperature for Deer Fern and Western Red Cedar
+species_to_plot <- c("Deer Fern", "Western Red Cedar")
+for (species in species_to_plot) {
+  plant <- subset(plant_data, Species == species)
+  preferred_max_temp <- as.numeric(plant$Preferred.Max.Temp..C.)
+  
+  # Subset KDE data for summer season only
+  summer_data <- subset(daytime_high_kde_data, Season == "Summer")
+  
+  # Plot KDE for each year with plant's preferred max temperature
+  p <- ggplot(summer_data, aes(x = Temperature, y = Density, color = Year, fill = Year)) +
+    geom_line(size = 1) +
+    geom_ribbon(aes(ymin = 0, ymax = Density), alpha = 0.2) +
+    # Add vertical line for plant's preferred max temperature
+    geom_vline(xintercept = preferred_max_temp, linetype = "dashed", color = "darkred") +
+    # Highlight area to the right of preferred max temperature
+    geom_area(data = subset(summer_data, Temperature >= preferred_max_temp),
+              aes(x = Temperature, y = Density), fill = "red", alpha = 0.3) +
+    labs(title = paste("KDE of Summer High Temperatures with", species, "Preferred Max Temperature"),
+         x = "Temperature (°C)",
+         y = "Density",
+         color = "Year",
+         fill = "Year") +
+    theme_minimal() +
+    scale_color_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red")) +
+    scale_fill_manual(values = c("Past" = "skyblue", "2050s" = "orange", "2080s" = "red"))
+  
+  # Print the plot for each species
+  print(p)
+}
+```
+```{r 25%}
+plant_data <- read.csv('C:/Users/Slava/Documents/EVSC 400/PlantData.csv')
+
+# Initialize a dataframe to store results for 25% exceedance temperature
+exceedance_results <- data.frame(Species = character(), Year = character(), Exceedance_Temperature = numeric(), stringsAsFactors = FALSE)
+
+# Loop over each plant to calculate the temperature exceeded on 25% of days
+for (i in 1:nrow(plant_data)) {
+  plant <- plant_data[i, ]
+  plant_name <- plant$Species
+  
+  # Loop through each time period: Past, 2050s, 2080s
+  for (year in unique(summer_day_data$Year)) {
+    # Subset data for each year
+    year_data <- subset(summer_day_data, Year == year)
+
+    # Calculate the 75th percentile for the temperature data
+    exceedance_temp <- quantile(year_data$Temperature, 0.75)
+
+    # Store the result in the exceedance_results dataframe
+    exceedance_results <- rbind(
+      exceedance_results, 
+      data.frame(Species = plant_name, Year = year, Exceedance_Temperature = round(exceedance_temp, 2))
+    )
+  }
+}
+
+# Print the exceedance results as a table
+print(exceedance_results)
+```
+
+
+```{r another try}
+# Load necessary libraries
+library(dplyr)
+
+# Step 1: Load plant data from CSV
+plant_data <- read.csv('C:/Users/Slava/Documents/EVSC 400/PlantData.csv')
+
+# Step 2: Clean column names to ensure compatibility
+colnames(plant_data) <- make.names(colnames(plant_data))
+
+# Step 3: Define user preferences
+user_preferences <- list(
+  Soil_Moisture = "Moist", 
+  Soil_Texture = "Sandy",              
+  Sunlight = "Sun",            
+  TemperatureInput = 30             
+)
+
+# Step 5: Calculate exceedance temperature for all plants
+exceedance_results <- data.frame(Species = character(), Year = character(), Exceedance_Temperature = numeric(), stringsAsFactors = FALSE)
+
+for (i in 1:nrow(plant_data)) {
+  plant <- plant_data[i, ]
+  plant_name <- plant$Species
+  
+  for (year in unique(summer_day_data$Year)) {
+    year_data <- subset(summer_day_data, Year == year)
+    exceedance_temp <- quantile(year_data$Temperature, 0.75) # 75th percentile
+    exceedance_results <- rbind(
+      exceedance_results, 
+      data.frame(Species = plant_name, Year = year, Exceedance_Temperature = round(exceedance_temp, 2))
+    )
+  }
+}
+
+# Merge exceedance results with plant data
+plant_data <- merge(plant_data, exceedance_results, by = "Species")
+
+# Step 6: Filter plants based on user preferences and handle multiple conditions
+filtered_plants <- plant_data %>%
+  filter(
+    # Handle multiple soil textures
+    sapply(Soil.Texture, function(x) {
+      user_preferences$Soil_Texture %in% unlist(strsplit(as.character(x), "[ ,]+"))
+    }) &
+    # Handle multiple soil moistures
+    sapply(Soil.Moisture, function(x) {
+      user_preferences$Soil_Moisture %in% unlist(strsplit(as.character(x), "[ ,]+"))
+    }) &
+    # Handle multiple sunlight conditions
+    sapply(Sunlight, function(x) {
+      user_preferences$Sunlight %in% unlist(strsplit(as.character(x), "[ ,]+"))
+    }) &
+    # Match exceedance temperature
+    Exceedance_Temperature <= user_preferences$TemperatureInput
+  )
+
+# Step 7: Select all plants that meet the conditions and keep specific columns
+if (nrow(filtered_plants) == 0) {
+  print("No suitable plants found.")
+} else {
+  # Select only the desired columns
+  final_plants <- filtered_plants %>%
+    select(Species, Year, Soil.Moisture, Soil.Texture, Sunlight, Exceedance_Temperature)
+  
+  print("All Plants Meeting the Given Preferences:")
+  print(final_plants)
+}
+
+```
